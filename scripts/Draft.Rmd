@@ -1,0 +1,348 @@
+---
+title: "Project Draft"
+author: "Lauren Berny"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(colorblindr)
+library(rio)
+library(here)
+library(tidyverse)
+library(gghighlight)
+library(scales)
+library(viridis)
+library(heatmaply)
+library(plotly)
+options(scipen=10000)
+
+yrbs_nat <- import(here("data", "sadc2019_national.sav")) %>% 
+ factorize()
+
+yrbs_fact <- import(here("data", "YRBS_states.sav")) %>% 
+ factorize()
+
+# yrbs <- import(here("data", "YRBS_states.sav"))
+
+# yrbs <- yrbs %>% 
+#  select(sitecode, year, qn13, qn15, qn16, qn18, qn23, q57)
+
+library(albersusa)
+us <- usa_sf()
+us2 <- import(here("data","us.csv"))
+
+us2$sitecode <- us2$State
+yrbs_fact <- left_join(yrbs_fact, us2)
+```
+
+# National Trends
+```{r measage=FALSE, error=FALSE, fig.width=8, fig.height=6, fig.align = 'center'}
+qn15 <- yrbs_nat %>%
+ select(weight, year, "qn" = "qn15") %>% 
+ filter(!is.na(qn)) %>% 
+ group_by(year, qn) %>% 
+ count(qn, wt = weight) %>% 
+ group_by(year) %>% 
+ mutate(freq = n / sum(n)) %>% 
+ mutate(percent = freq*100, question = "Did not go to school because they felt unsafe (past 30 days)") %>% 
+ filter(qn=="Yes")
+
+qn18 <- yrbs_nat %>%
+ select(weight, year, "qn" = "qn18") %>% 
+ filter(!is.na(qn)) %>% 
+ group_by(year, qn) %>% 
+ count(qn, wt = weight) %>% 
+ group_by(year) %>% 
+ mutate(freq = n / sum(n)) %>% 
+ mutate(percent = freq*100, question = "Were in a physical fight on school property (past 12 months)") %>% 
+ filter(qn=="Yes")
+
+qn13 <- yrbs_nat %>%
+ select(weight, year, "qn" = "qn13") %>% 
+ filter(!is.na(qn)) %>% 
+ group_by(year, qn) %>% 
+ count(qn, wt = weight) %>% 
+ group_by(year) %>% 
+ mutate(freq = n / sum(n)) %>% 
+ mutate(percent = freq*100, question = "Carried a weapon on school property (past 30 days)") %>% 
+ filter(qn=="Yes")
+
+qn16 <- yrbs_nat %>%
+ select(weight, year, "qn" = "qn16") %>% 
+ filter(!is.na(qn)) %>% 
+ group_by(year, qn) %>% 
+ count(qn, wt = weight) %>% 
+ group_by(year) %>% 
+ mutate(freq = n / sum(n)) %>% 
+ mutate(percent = freq*100, question = "Were threatened/injured with a weapon at school (past 12 months)") %>% 
+ filter(qn=="Yes")
+
+schoolsafety <- rbind(qn13, qn15, qn16, qn18)
+
+ggplot(schoolsafety, aes(x = year, y = freq, fill = question)) +
+ facet_wrap(~question) +
+  geom_line() +
+  geom_point(size = 3, shape = 21) +
+ scale_x_continuous(limits = c(1993,2019), n.breaks = 7) +
+ scale_y_continuous(limits = c(0, .20), labels = scales::percent) +
+ scale_fill_discrete_sequential(palette = "sunset") +
+ labs(x = "Year", y = "Percentage of students surveyed", title = "School Safety Trends Reported by U.S. High School Students", caption = "Source: CDC YRBS") +
+ theme_bw() +
+  theme(legend.position = "none")
+```
+
+
+# State-Level Data (2019)
+```{r measage=FALSE, error=FALSE, fig.width=10, fig.height=8, fig.align = 'center'}
+qn13 <- yrbs_fact %>%
+ select(weight, "iso_3166_2" = "State Code", year, "qn" = "qn13") %>% 
+ filter(!is.na(qn)) %>% 
+ group_by(iso_3166_2, year, qn) %>% 
+ count(qn, wt = weight) %>% 
+ group_by(iso_3166_2, year) %>% 
+ mutate(freq = n / sum(n)) %>% 
+ mutate(percent = freq*100, question = "Carried a weapon on school property (past 30 days)") %>% 
+ filter(qn=="Yes")
+qn13$iso_3166_2 <- as.factor(qn13$iso_3166_2)
+
+qn15 <- yrbs_fact %>%
+ select(weight, "iso_3166_2" = "State Code", year, "qn" = "qn15") %>% 
+ filter(!is.na(qn)) %>% 
+ group_by(iso_3166_2, year, qn) %>% 
+ count(qn, wt = weight) %>% 
+ group_by(iso_3166_2, year) %>% 
+ mutate(freq = n / sum(n)) %>% 
+ mutate(percent = freq*100, question = "Did not go to school because they felt unsafe (past 30 days)") %>% 
+ filter(qn=="Yes")
+qn15$iso_3166_2 <- as.factor(qn15$iso_3166_2)
+
+qn16 <- yrbs_fact %>%
+ select(weight, "iso_3166_2" = "State Code", year, "qn" = "qn16") %>% 
+ filter(!is.na(qn)) %>% 
+ group_by(iso_3166_2, year, qn) %>% 
+ count(qn, wt = weight) %>% 
+ group_by(iso_3166_2, year) %>% 
+ mutate(freq = n / sum(n)) %>% 
+ mutate(percent = freq*100, question = "Were threatened/injured with a weapon at school (past 12 months)") %>% 
+ filter(qn=="Yes")
+qn16$iso_3166_2 <- as.factor(qn16$iso_3166_2)
+
+qn18 <- yrbs_fact %>%
+ select(weight, "iso_3166_2" = "State Code", year, "qn" = "qn18") %>% 
+ filter(!is.na(qn)) %>% 
+ group_by(iso_3166_2, year, qn) %>% 
+ count(qn, wt = weight) %>% 
+ group_by(iso_3166_2, year) %>% 
+ mutate(freq = n / sum(n)) %>% 
+ mutate(percent = freq*100, question = "Were in a physical fight on school property (past 12 months)") %>% 
+ filter(qn=="Yes")
+qn18$iso_3166_2 <- as.factor(qn18$iso_3166_2)
+
+schoolsafety <- rbind(qn13, qn15, qn16, qn18)
+
+schoolsafety <- schoolsafety %>% 
+ filter(year==2019)
+
+full_set <- expand.grid(iso_3166_2 = unique(us$iso_3166_2), question = unique(schoolsafety$question))
+school <- left_join(full_set, schoolsafety)
+school_geo <- left_join(us, school)
+
+ggplot(school_geo) +
+geom_sf(aes(fill = percent)) +
+facet_wrap(~question) +
+colorspace::scale_fill_continuous_sequential(palette = "Sunset", na.value = "gray90", name = "Percentage of Students Surveyed", guide = guide_colorbar(title.position = "top", title.hjust = 0.5)) +
+ labs(title="School Safety Across the United States", 
+      caption = "Source: CDC YRBS (2019)") +
+theme_minimal() +
+theme(legend.direction = "horizontal",
+legend.position = "bottom",
+legend.key.size = unit(2, 'cm'),
+legend.key.height = unit(.5,"cm"),
+axis.text.x = element_text(size = 5))
+```
+
+
+# Who feels unsafe in schools? (2019)
+```{r measage=FALSE, error=FALSE, fig.width=7.25, fig.height=5, fig.align = 'center'}
+race <- yrbs_nat %>%
+ select(weight, "qn" = "qn15",  "demographic" = "race4") %>% 
+ filter(!is.na(qn)) %>%
+ filter(!is.na(demographic)) %>% 
+ group_by(demographic) %>% 
+ count(qn, wt = weight) %>% 
+ mutate(freq = n / sum(n)) %>% 
+ mutate(percent = freq*100, group = "Race") %>% 
+ filter(qn=="Yes")
+
+race$demographic <- fct_reorder(race$demographic, race$percent)
+
+sex <- yrbs_nat %>%
+ select(weight, "qn" = "qn15", "demographic" = "sex") %>% 
+ filter(!is.na(qn)) %>% 
+ filter(!is.na(demographic)) %>% 
+ group_by(demographic) %>% 
+ count(qn, wt = weight) %>% 
+ mutate(freq = n / sum(n)) %>% 
+ mutate(percent = freq*100, group = "Biological Sex") %>% 
+ filter(qn=="Yes")
+
+sex$demographic <- fct_reorder(sex$demographic, sex$percent)
+
+sexid <- yrbs_nat %>%
+ select(weight, "qn" = "qn15", "demographic" = "sexid") %>% 
+ filter(!is.na(qn)) %>% 
+ filter(!is.na(demographic)) %>% 
+ group_by(demographic) %>% 
+ count(qn, wt = weight) %>% 
+ mutate(freq = n / sum(n)) %>% 
+ mutate(percent = freq*100, group = "Sexual Identity") %>% 
+ filter(qn=="Yes")
+
+sexid$demographic <- fct_reorder(sexid$demographic, sexid$percent)
+
+demos <- rbind(sex, sexid, race)
+
+demos %>%
+ ggplot(aes(x = freq, y = demographic, fill = group)) +
+ geom_point(size = 4, shape = 21) +
+ scale_x_continuous(limits = c(0, .15), labels = scales::percent) +
+ scale_fill_discrete_sequential(palette = "sunset") +
+ labs(title = "Did not go to school because they felt unsafe (past 30 days)",
+       x = "Percentage of students", y = "Demographics", 
+      caption = "Source: CDC YRBS (2019)") +
+ theme_bw() +
+ theme(legend.direction = "horizontal", legend.position = "botton")
+```
+
+```{r eval=F, print=F, echo=F}
+school <- yrbs_fact %>%
+ select(weight, "iso_3166_2" = "State Code", year, qn13, qn15, qn16, qn18, qn23,
+        q57) %>% 
+ filter(!is.na(qn13)) %>% 
+ group_by(iso_3166_2, year, qn13) %>% 
+ count(qn13 , wt = weight) %>% 
+ group_by(iso_3166_2, year) %>% 
+ mutate(freq = n / sum(n)) %>% 
+ mutate(percent = freq*100, ) %>% 
+ filter(qn13=="Yes")
+school$iso_3166_2 <- as.factor(school$iso_3166_2)
+
+full_set <- expand.grid(iso_3166_2 = unique(us$iso_3166_2), year = 2003:2019)
+full_set <- full_set %>% 
+ filter(year==2003 | year==2005 | year==2007 | year==2009 | year==2011 |
+        year==2013 | year==2015 | year==2017 | year==2019)
+school <- left_join(full_set, school)
+school_geo <- left_join(us, school)
+
+
+ggplot(school_geo) +
+geom_sf(aes(fill = percent)) +
+facet_wrap(~year) +
+colorspace::scale_fill_continuous_sequential(palette = "Sunset", na.value = "gray90", name = "Percent") +
+theme_minimal() +
+theme(legend.direction = "horizontal",
+legend.position = "top",
+legend.key.size = unit(2, 'cm'),
+legend.key.height = unit(.5,"cm"),
+axis.text.x = element_text(size = 5))
+```
+
+```{r eval=F, print=F,  echo=F}
+school <- yrbs_fact %>%
+ select(weight, "iso_3166_2" = "State Code", year, qn13, qn15, qn16, qn18, qn23,
+        q57) %>% 
+ filter(!is.na(qn16)) %>% 
+ group_by(iso_3166_2, year, qn16) %>% 
+ count(qn16, wt = weight) %>% 
+ group_by(iso_3166_2, year) %>% 
+ mutate(freq = n / sum(n)) %>% 
+ mutate(percent = freq*100) %>% 
+ filter(qn16=="Yes")
+school$iso_3166_2 <- as.factor(school$iso_3166_2)
+
+full_set <- expand.grid(iso_3166_2 = unique(us$iso_3166_2), year = 2003:2019)
+full_set <- full_set %>% 
+ filter(year==2003 | year==2005 | year==2007 | year==2009 | year==2011 |
+        year==2013 | year==2015 | year==2017 | year==2019)
+school <- left_join(full_set, school)
+school_geo <- left_join(us, school)
+
+ggplot(school_geo) +
+geom_sf(aes(fill = percent)) +
+facet_wrap(~year) +
+colorspace::scale_fill_continuous_sequential(palette = "Sunset", na.value = "gray90", name = "Percent") +
+theme_minimal() +
+theme(legend.direction = "horizontal",
+legend.position = "top",
+legend.key.size = unit(2, 'cm'),
+legend.key.height = unit(.5,"cm"),
+axis.text.x = element_text(size = 5))
+```
+
+```{r eval=F, print=F,  echo=F}
+school <- yrbs_fact %>%
+ select(weight, "iso_3166_2" = "State Code", year, qn13, qn15, qn16, qn18, qn23,
+        q57) %>% 
+ filter(!is.na(qn18)) %>% 
+ group_by(iso_3166_2, year, qn18) %>% 
+ count(qn18, wt = weight) %>% 
+ group_by(iso_3166_2, year) %>% 
+ mutate(freq = n / sum(n)) %>% 
+ mutate(percent = freq*100) %>% 
+ filter(qn18=="Yes")
+school$iso_3166_2 <- as.factor(school$iso_3166_2)
+
+full_set <- expand.grid(iso_3166_2 = unique(us$iso_3166_2), year = 2003:2019)
+full_set <- full_set %>% 
+ filter(year==2003 | year==2005 | year==2007 | year==2009 | year==2011 |
+        year==2013 | year==2015 | year==2017 | year==2019)
+school <- left_join(full_set, school)
+school_geo <- left_join(us, school)
+
+ggplot(school_geo) +
+geom_sf(aes(fill = percent)) +
+facet_wrap(~year) +
+colorspace::scale_fill_continuous_sequential(palette = "Sunset", na.value = "gray90", name = "Percent") +
+theme_minimal() +
+theme(legend.direction = "horizontal",
+legend.position = "top",
+legend.key.size = unit(2, 'cm'),
+legend.key.height = unit(.5,"cm"),
+axis.text.x = element_text(size = 5))
+```
+
+```{r eval=F, print=F,  echo=F}
+school <- yrbs_fact %>%
+ select(weight, "iso_3166_2" = "State Code", year, qn13, qn15, qn16, qn18, qn23,
+        q57) %>% 
+ filter(!is.na(qn15)) %>% 
+ group_by(iso_3166_2, year, qn15) %>% 
+ count(qn15, wt = weight) %>% 
+ group_by(iso_3166_2, year) %>% 
+ mutate(freq = n / sum(n)) %>% 
+ mutate(percent = freq*100) %>% 
+ filter(qn15=="Yes")
+school$iso_3166_2 <- as.factor(school$iso_3166_2)
+
+full_set <- expand.grid(iso_3166_2 = unique(us$iso_3166_2), year = 2003:2019)
+full_set <- full_set %>% 
+ filter(year==2003 | year==2005 | year==2007 | year==2009 | year==2011 |
+        year==2013 | year==2015 | year==2017 | year==2019)
+school <- left_join(full_set, school)
+school_geo <- left_join(us, school)
+
+ggplot(school_geo) +
+geom_sf(aes(fill = percent)) +
+facet_wrap(~year) +
+colorspace::scale_fill_continuous_sequential(palette = "Sunset", na.value = "gray90", name = "Percent") +
+theme_minimal() +
+theme(legend.direction = "horizontal",
+legend.position = "top",
+legend.key.size = unit(2, 'cm'),
+legend.key.height = unit(.5,"cm"),
+axis.text.x = element_text(size = 5))
+```
+
+
